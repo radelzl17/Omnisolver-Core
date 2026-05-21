@@ -2,56 +2,52 @@ const http = require('http');
 const TelegramBot = require('node-telegram-bot-api');
 const { GoogleGenAI } = require('@google/genai');
 
-// 1. Configuración de Variables de Entorno
 const token = process.env.TELEGRAM_TOKEN;
 const apiKey = process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 7860;
 
 if (!token || !apiKey) {
-    console.error("[ERROR CRÍTICO] Faltan variables de entorno en Hugging Face.");
+    console.error("[ERROR] Falta TELEGRAM_TOKEN o GEMINI_API_KEY en los Secrets.");
     process.exit(1);
 }
 
-// 2. Inicializar Clientes (Telegram en modo Polling para la nube)
+// Inicializar el bot en modo polling activo
 const bot = new TelegramBot(token, { polling: true });
 const ai = new GoogleGenAI({ apiKey: apiKey });
 
-console.log("[SISTEMA] Conectando servicios...");
+console.log("[SISTEMA] Omnisolver Core inicializado con éxito. Escuchando Telegram...");
 
-// 3. Lógica del Bot de Telegram con Gemini
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // Ignorar mensajes vacíos o comandos iniciales comunes si se prefiere
-    if (!text) return;
+    if (!text || text.startsWith('/')) {
+        if (text === '/start') {
+            bot.sendMessage(chatId, "¡Omnisolver Core en línea! Envíame cualquier dilema o consulta de negocio y la procesaré con Gemini.");
+        }
+        return;
+    }
 
-    // Enviar estado de "escribiendo..." en Telegram para mejorar UX
     bot.sendChatAction(chatId, 'typing');
 
     try {
-        // Llamada oficial a la API de Gemini usando el modelo rápido idóneo para agentes
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: text,
         });
 
-        const replyText = response.text || "No obtuve una respuesta clara del motor.";
-        
-        // Responder al usuario en Telegram
+        const replyText = response.text || "No obtuve una respuesta clara.";
         await bot.sendMessage(chatId, replyText);
     } catch (error) {
-        console.error("Error procesando con Gemini:", error);
-        await bot.sendMessage(chatId, "Lo siento, tuve un problema al procesar tu solicitud en mi cerebro de IA.");
+        console.error("Error en Gemini:", error);
+        await bot.sendMessage(chatId, "Error interno en mi cerebro de IA.");
     }
 });
 
-// 4. Mantener vivo el contenedor en Hugging Face
-const server = http.createServer((req, res) => {
+// Servidor de respaldo para Hugging Face
+http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Omnisolver Core está funcionando activamente.\n');
-});
-
-server.listen(PORT, () => {
-    console.log(`[OK] Servidor web escuchando en puerto ${PORT}`);
+    res.end('Omnisolver Core Live\n');
+}).listen(PORT, () => {
+    console.log(`Servidor HTTP activo en puerto ${PORT}`);
 });
