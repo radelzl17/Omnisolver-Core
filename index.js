@@ -1,6 +1,6 @@
 const http = require('http');
 const TelegramBot = require('node-telegram-bot-api');
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const token = process.env.TELEGRAM_TOKEN;
 const apiKey = process.env.GEMINI_API_KEY;
@@ -11,9 +11,9 @@ if (!token || !apiKey) {
     process.exit(1);
 }
 
-// Inicializar el bot en modo polling activo
 const bot = new TelegramBot(token, { polling: true });
-const ai = new GoogleGenAI({ apiKey: apiKey });
+const ai = new GoogleGenerativeAI(apiKey);
+const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 console.log("[SISTEMA] Omnisolver Core inicializado con éxito. Escuchando Telegram...");
 
@@ -23,7 +23,7 @@ bot.on('message', async (msg) => {
 
     if (!text || text.startsWith('/')) {
         if (text === '/start') {
-            bot.sendMessage(chatId, "¡Omnisolver Core en línea! Envíame cualquier dilema o consulta de negocio y la procesaré con Gemini.");
+            bot.sendMessage(chatId, "¡Omnisolver Core en línea! Envíame cualquier consulta.");
         }
         return;
     }
@@ -31,12 +31,9 @@ bot.on('message', async (msg) => {
     bot.sendChatAction(chatId, 'typing');
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: text,
-        });
-
-        const replyText = response.text || "No obtuve una respuesta clara.";
+        const result = await model.generateContent(text);
+        const response = await result.response;
+        const replyText = response.text();
         await bot.sendMessage(chatId, replyText);
     } catch (error) {
         console.error("Error en Gemini:", error);
@@ -44,7 +41,6 @@ bot.on('message', async (msg) => {
     }
 });
 
-// Servidor de respaldo para Hugging Face
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Omnisolver Core Live\n');
